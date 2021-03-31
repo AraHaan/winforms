@@ -3,46 +3,51 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Buffers;
 using System.Runtime.InteropServices;
-using System.Text;
 
 internal static partial class Interop
 {
     internal static partial class Shell32
     {
         [DllImport(Libraries.Shell32, ExactSpelling = true, EntryPoint = "DragQueryFileW", CharSet = CharSet.Unicode)]
-#pragma warning disable CA1838 // Avoid 'StringBuilder' parameters for P/Invokes
-        private static extern uint DragQueryFileWInternal(IntPtr hDrop, uint iFile, StringBuilder? lpszFile, uint cch);
-#pragma warning restore CA1838 // Avoid 'StringBuilder' parameters for P/Invokes
+        private static extern unsafe uint DragQueryFileWInternal(IntPtr hDrop, uint iFile, char* lpszFile, uint cch);
 
-        public static uint DragQueryFileW(IntPtr hDrop, uint iFile, StringBuilder? lpszFile)
+        public static unsafe uint DragQueryFileW(IntPtr hDrop, uint iFile, int capacity, out string lpszFile)
         {
-            if (lpszFile is null || lpszFile.Capacity == 0 || iFile == 0xFFFFFFFF)
+            if (capacity == 0 || iFile == 0xFFFFFFFF)
             {
+                lpszFile = string.Empty;
                 return DragQueryFileWInternal(hDrop, iFile, null, 0);
             }
 
-            uint resultValue = 0;
-
-            // iterating by allocating chunk of memory each time we find the length is not sufficient.
-            // Performance should not be an issue for current MAX_PATH length due to this
-            if ((resultValue = DragQueryFileWInternal(hDrop, iFile, lpszFile, (uint)lpszFile.Capacity)) == lpszFile.Capacity)
+            uint resultValue;
+            char[] buf = ArrayPool<char>.Shared.Rent(capacity);
+            fixed (char* valueChars = &buf[0])
             {
-                // passing null for buffer will return actual number of charectors in the file name.
-                // So, one extra call would be suffice to avoid while loop in case of long path.
-                uint capacity = DragQueryFileWInternal(hDrop, iFile, null, 0);
-                if (capacity < Kernel32.MAX_UNICODESTRING_LEN)
+                // iterating by allocating chunk of memory each time we find the length is not sufficient.
+                // Performance should not be an issue for current MAX_PATH length due to this
+                if ((resultValue = DragQueryFileWInternal(hDrop, iFile, valueChars, (uint)capacity)) == capacity)
                 {
-                    lpszFile.EnsureCapacity((int)capacity);
-                    resultValue = DragQueryFileWInternal(hDrop, iFile, lpszFile, (uint)capacity);
-                }
-                else
-                {
-                    resultValue = 0;
+                    // passing null for buffer will return actual number of characters in the file name.
+                    // So, one extra call would be suffice to avoid while loop in case of long path.
+                    uint internalCapacity = DragQueryFileWInternal(hDrop, iFile, null, 0);
+                    if (internalCapacity < Kernel32.MAX_UNICODESTRING_LEN)
+                    {
+                        ArrayPool<char>.Shared.Return(buf, true);
+                        buf = ArrayPool<char>.Shared.Rent((int)internalCapacity);
+                        resultValue = DragQueryFileWInternal(hDrop, iFile, valueChars, internalCapacity);
+                    }
+                    else
+                    {
+                        resultValue = 0;
+                    }
                 }
             }
 
-            lpszFile.Length = (int)resultValue;
+            // Set lpszFile to the buffer's data.
+            lpszFile = buf.AsSpan().Slice(0, (int)resultValue).ToString().Trim('\0');
+            ArrayPool<char>.Shared.Return(buf, true);
             return resultValue;
         }
     }

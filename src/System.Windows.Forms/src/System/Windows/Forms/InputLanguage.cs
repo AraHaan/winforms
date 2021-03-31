@@ -2,10 +2,10 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Text;
 using Microsoft.Win32;
 using static Interop;
 
@@ -281,15 +281,26 @@ namespace System.Windows.Forms
         ///  Returning null from this method will force us to use the legacy codepath (pulling the text
         ///  directly from the registry).
         /// </summary>
-        private static string? GetLocalizedKeyboardLayoutName(string? layoutDisplayName)
+        private static unsafe string? GetLocalizedKeyboardLayoutName(string? layoutDisplayName)
         {
             if (layoutDisplayName != null)
             {
-                var sb = new StringBuilder(512);
-                HRESULT res = Shlwapi.SHLoadIndirectString(layoutDisplayName, sb, (uint)sb.Capacity, IntPtr.Zero);
-                if (res == HRESULT.S_OK)
+                char[] buf = ArrayPool<char>.Shared.Rent(512);
+                for (int i = 0; i < buf.Length; i++)
                 {
-                    return sb.ToString();
+                    // clear the garbage data out.
+                    buf[0] = '\0';
+                }
+
+                fixed (char* valueChars = &buf[0])
+                {
+                    HRESULT res = Shlwapi.SHLoadIndirectString(layoutDisplayName, valueChars, (uint)buf.Length, IntPtr.Zero);
+                    if (res == HRESULT.S_OK)
+                    {
+                        string? result = buf.AsSpan().ToString().Trim('\0');
+                        ArrayPool<char>.Shared.Return(buf, true);
+                        return result;
+                    }
                 }
             }
 

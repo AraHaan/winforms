@@ -4,6 +4,7 @@
 
 #nullable disable
 
+using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -16,7 +17,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
-using System.Text;
 using System.Threading;
 using System.Windows.Forms.Automation;
 using System.Windows.Forms.Layout;
@@ -2508,7 +2508,7 @@ namespace System.Windows.Forms
             set => SetBounds(_x, _y, _width, value, BoundsSpecified.Height);
         }
 
-        internal bool HostedInWin32DialogManager
+        internal unsafe bool HostedInWin32DialogManager
         {
             get
             {
@@ -2523,22 +2523,25 @@ namespace System.Windows.Forms
                     {
                         IntPtr parentHandle = User32.GetParent(this);
                         IntPtr lastParentHandle = parentHandle;
-
-                        StringBuilder sb = new StringBuilder(32);
-
                         SetState(States.HostedInDialog, false);
-
                         while (parentHandle != IntPtr.Zero)
                         {
+                            int capacity = 32;
                             int len = UnsafeNativeMethods.GetClassName(new HandleRef(null, lastParentHandle), null, 0);
-                            if (len > sb.Capacity)
+                            if (len > capacity)
                             {
-                                sb.Capacity = len + 5;
+                                capacity = len + 5;
                             }
 
-                            UnsafeNativeMethods.GetClassName(new HandleRef(null, lastParentHandle), sb, sb.Capacity);
+                            char[] buf = ArrayPool<char>.Shared.Rent(capacity);
+                            fixed (char* valueChars = &buf[0])
+                            {
+                                len = UnsafeNativeMethods.GetClassName(new HandleRef(null, lastParentHandle), valueChars, buf.Length);
+                            }
 
-                            if (sb.ToString() == "#32770")
+                            string result = buf.AsSpan().Slice(0, len).ToString().Trim('\0');
+                            ArrayPool<char>.Shared.Return(buf, true);
+                            if (result == "#32770")
                             {
                                 SetState(States.HostedInDialog, true);
                                 break;

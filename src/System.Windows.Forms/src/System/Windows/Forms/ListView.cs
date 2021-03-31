@@ -4,6 +4,7 @@
 
 #nullable disable
 
+using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -5141,14 +5142,8 @@ namespace System.Windows.Forms
             if (BackgroundImage != null)
             {
                 // save the image to a temporary file name
-                string tempDirName = System.IO.Path.GetTempPath();
-                Text.StringBuilder sb = new Text.StringBuilder(1024);
-                UnsafeNativeMethods.GetTempFileName(tempDirName, GenerateRandomName(), 0, sb);
-
-                backgroundImageFileName = sb.ToString();
-
+                backgroundImageFileName = System.IO.Path.GetTempFileName();
                 BackgroundImage.Save(backgroundImageFileName, System.Drawing.Imaging.ImageFormat.Bmp);
-
                 lvbkImage.cchImageMax = (uint)(backgroundImageFileName.Length + 1);
                 lvbkImage.ulFlags = LVBKIF.SOURCE_URL;
                 if (BackgroundImageTiled)

@@ -4,8 +4,8 @@
 
 #nullable disable
 
+using System.Buffers;
 using System.Runtime.InteropServices;
-using System.Text;
 using static Interop;
 using static Interop.User32;
 
@@ -14,7 +14,7 @@ namespace System.Windows.Forms
     public partial class ComboBox
     {
         /// <summary>
-        ///  This finds all autcomplete windows that belong to the active thread.
+        ///  This finds all autocomplete windows that belong to the active thread.
         /// </summary>
         private class AutoCompleteDropDownFinder
         {
@@ -55,11 +55,18 @@ namespace System.Windows.Forms
                 return BOOL.TRUE;
             }
 
-            static string GetClassName(HandleRef hRef)
+            private static unsafe string GetClassName(HandleRef hRef)
             {
-                StringBuilder sb = new StringBuilder(MaxClassName);
-                UnsafeNativeMethods.GetClassName(hRef, sb, MaxClassName);
-                return sb.ToString();
+                char[] buf = ArrayPool<char>.Shared.Rent(MaxClassName);
+                int length;
+                fixed (char* valueChars = &buf[0])
+                {
+                    length = UnsafeNativeMethods.GetClassName(hRef, valueChars, buf.Length);
+                }
+
+                string result = buf.AsSpan().Slice(0, length).ToString().Trim('\0');
+                ArrayPool<char>.Shared.Return(buf, true);
+                return result;
             }
         }
     }

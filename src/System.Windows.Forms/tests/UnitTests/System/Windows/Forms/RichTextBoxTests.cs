@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Buffers;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
@@ -10734,12 +10735,19 @@ namespace System.Windows.Forms.Tests
             public new void WndProc(ref Message m) => base.WndProc(ref m);
         }
 
-        private static string GetClassName(IntPtr hWnd)
+        private static unsafe string GetClassName(IntPtr hWnd)
         {
             const int MaxClassName = 256;
-            StringBuilder sb = new StringBuilder(MaxClassName);
-            UnsafeNativeMethods.GetClassName(new HandleRef(null, hWnd), sb, MaxClassName);
-            return sb.ToString();
+            int length;
+            char[] buf = ArrayPool<char>.Shared.Rent(MaxClassName);
+            fixed (char* valueChars = &buf[0])
+            {
+                length = UnsafeNativeMethods.GetClassName(new HandleRef(null, hWnd), valueChars, buf.Length);
+            }
+
+            string result = buf.AsSpan().Slice(0, length).ToString().Trim('\0');
+            ArrayPool<char>.Shared.Return(buf, true);
+            return result;
         }
 
         /// <summary>
