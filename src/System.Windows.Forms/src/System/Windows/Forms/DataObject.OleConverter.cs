@@ -397,7 +397,7 @@ namespace System.Windows.Forms
             private string[] ReadFileListFromHandle(IntPtr hdrop)
             {
                 uint count = Shell32.DragQueryFileW(hdrop, 0xFFFFFFFF, 0, out string _);
-                if (count is 0)
+                if (count == 0)
                 {
                     return null;
                 }
