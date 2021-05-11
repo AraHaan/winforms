@@ -296,7 +296,7 @@ namespace System.Windows.Forms
                 {
                     if (Shlwapi.SHLoadIndirectString(layoutDisplayName, valueChars, (uint)buf.Length, IntPtr.Zero).Succeeded())
                     {
-                        string? result = buf.AsSpan().ToString().Trim('\0');
+                        string? result = buf.AsSpan().SliceAtFirstNull().ToString();
                         ArrayPool<char>.Shared.Return(buf, true);
                         return result;
                     }
