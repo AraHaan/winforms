@@ -294,8 +294,7 @@ namespace System.Windows.Forms
 
                 fixed (char* valueChars = &buf[0])
                 {
-                    HRESULT res = Shlwapi.SHLoadIndirectString(layoutDisplayName, valueChars, (uint)buf.Length, IntPtr.Zero);
-                    if (res == HRESULT.S_OK)
+                    if (Shlwapi.SHLoadIndirectString(layoutDisplayName, valueChars, (uint)buf.Length, IntPtr.Zero).Succeeded())
                     {
                         string? result = buf.AsSpan().ToString().Trim('\0');
                         ArrayPool<char>.Shared.Return(buf, true);
