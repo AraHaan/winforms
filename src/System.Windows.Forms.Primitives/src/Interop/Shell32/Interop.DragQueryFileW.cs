@@ -46,7 +46,7 @@ internal static partial class Interop
             }
 
             // Set lpszFile to the buffer's data.
-            lpszFile = buf.AsSpan().Slice(0, (int)resultValue).ToString().Trim('\0');
+            lpszFile = buf.AsSpan().Slice(0, (int)resultValue).ToString();
             ArrayPool<char>.Shared.Return(buf, true);
             return resultValue;
         }
