@@ -1443,11 +1443,12 @@ namespace System.Windows.Forms
                 // Factor is used only to scale Font. After that AutoscaleFactor kicks in to scale controls.
                 var factor = ((float)deviceDpiNew) / deviceDpiOld;
 
-                if(!DpiFontsCache.TryGetValue(deviceDpiNew, out Font fontForDpi))
+                // DpiFontscache is availble only in PermonitorV2 mode applications.
+                if (!DpiFontsCache.TryGetValue(deviceDpiNew, out Font fontForDpi))
                 {
                     Font currentFont = Font;
                     fontForDpi = currentFont.WithSize(currentFont.Size * factor);
-                    DpiFontsCache.Add(deviceDpiNew, fontForDpi);
+                    AddToFontsDpiCache(deviceDpiNew, fontForDpi);
                 }
 
                 ScaledControlFont = fontForDpi;

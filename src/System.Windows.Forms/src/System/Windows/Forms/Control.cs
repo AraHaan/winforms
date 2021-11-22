@@ -338,8 +338,9 @@ namespace System.Windows.Forms
         // no explicit scaling of children required in such cases. They have specific logic.
         internal bool _doNotScaleChildren;
 
-        // Holds Fonts for various Dpi values of the control in PermonV2 mode.
-        internal readonly Dictionary<int, Font> DpiFontsCache = new Dictionary<int, Font>();
+        // Contains a collection of calculated fonts for various Dpi values of the control in the PerMonV2 mode.
+        private protected Dictionary<int, Font> DpiFontsCache;
+
 #if DEBUG
         internal int LayoutSuspendCount
         {
@@ -383,7 +384,6 @@ namespace System.Windows.Forms
 
             // Initialize Dpi to the value on the primary screen, we will have the correct value when the Handle is created.
             _deviceDpi = _oldDeviceDpi = DpiHelper.DeviceDpi;
-
             _window = new ControlNativeWindow(this);
             RequiredScalingEnabled = true;
             RequiredScaling = BoundsSpecified.All;
@@ -2103,10 +2103,7 @@ namespace System.Windows.Forms
                 bool localChanged = false;
                 if (value is null)
                 {
-                    if (local is not null)
-                    {
-                        localChanged = true;
-                    }
+                    localChanged = local is not null;
                 }
                 else
                 {
@@ -2115,7 +2112,7 @@ namespace System.Windows.Forms
 
                 if (localChanged)
                 {
-                    // If Font bing assigned is equal to the current default Font, we just set the property bag no need to raise OnFontChangedEvent.
+                    // If the value being assigned is the same as the current default font, we do not need to raise FontChangedEvent.
                     Font currentDefaultFont = Font;
                     Properties.SetObject(s_fontProperty, value);
 
@@ -2126,8 +2123,8 @@ namespace System.Windows.Forms
 
                         if (DpiHelper.IsPerMonitorV2Awareness)
                         {
-                            // Reset ScaledControlFont when Font is being set explicitly, in order to keep it
-                            // in sync when application moved between different Dpi monitors.
+                            // Reset the ScaledControlFont value when the font is being set explicitly, in order to keep it
+                            // in sync when the application is moved between monitors with different Dpi settings.
                             ScaledControlFont = null;
                             ClearDpiFontsCache();
                         }
@@ -2155,6 +2152,18 @@ namespace System.Windows.Forms
                     }
                 }
             }
+        }
+
+        private protected void AddToFontsDpiCache(int dpi, Font font)
+        {
+            if (!DpiHelper.IsPerMonitorV2Awareness
+                || User32.AreDpiAwarenessContextsEqual(DpiAwarenessContext, User32.DPI_AWARENESS_CONTEXT.PER_MONITOR_AWARE_V2))
+            {
+                throw new InvalidOperationException(SR.CacheFontsOnlyInPermonitorV2Mode);
+            }
+
+            DpiFontsCache ??= new Dictionary<int, Font>();
+            DpiFontsCache.Add(dpi, font);
         }
 
         private void ClearDpiFontsCache()
@@ -7840,7 +7849,7 @@ namespace System.Windows.Forms
                             // Dpi change requires font to be recalculated in order to get controls scaled with right dpi.
                             var factor = (float)_deviceDpi / fontDpi;
 
-                            if(!DpiFontsCache.TryGetValue(_deviceDpi, out Font fontForDpi))
+                            if (!DpiFontsCache.TryGetValue(_deviceDpi, out Font fontForDpi))
                             {
                                 fontForDpi = localFont.WithSize(localFont.Size * factor);
                                 DpiFontsCache.Add(_deviceDpi, fontForDpi);
@@ -11452,7 +11461,7 @@ namespace System.Windows.Forms
         /// </summary>
         /// <param name="scaledFont">The scaled <see cref="Font"/> value to be set.</param>
         /// <param name="raiseOnFontChangedEvent">Indicates whether to raise <see cref="OnFontChanged(EventArgs)"/> event.</param>
-        internal void SetScaledFont(Font scaledFont, bool raiseOnFontChangedEvent = true)
+        private protected void SetScaledFont(Font scaledFont, bool raiseOnFontChangedEvent = true)
         {
             // Store new scaled value
             Properties.SetObject(s_fontProperty, scaledFont);
