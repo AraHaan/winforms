@@ -2152,6 +2152,8 @@ namespace System.Windows.Forms
                     }
                 }
             }
+
+            DpiFontsCache.Clear();
         }
 
         private protected void AddToFontsDpiCache(int dpi, Font font)
