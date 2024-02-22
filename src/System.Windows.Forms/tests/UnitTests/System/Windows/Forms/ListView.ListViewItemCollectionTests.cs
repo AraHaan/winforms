@@ -98,4 +98,24 @@ public class ListView_ListViewItemCollectionTests
         Assert.Throws<ArgumentNullException>("key", () => collection.Find(key, searchAllSubItems: true));
         Assert.Throws<ArgumentNullException>("key", () => collection.Find(key, searchAllSubItems: false));
     }
+
+    [WinFormsFact]
+    public void ListViewItemCollection_Given_That_We_Want_To_Use_List_ListViewItem_To_Add_Items()
+    {
+        using ListView listView = new();
+        var list = new List<ListViewItem>();
+        var keys = new List<string>();
+        for (var i = 0; i < 10; i++)
+        {
+            list.Add(new ListViewItem() { $"item{i}" });
+            keys.Add($"item{i}");
+        }
+
+        ListView.ListViewItemCollection collection = listView.Items;
+        collection.AddRange(list);
+        foreach (var item in list)
+        {
+            Asset.Equal(item, collection.Find(key[list.IndexOf(item)], searchAllSubItems: false))l
+        }
+    }
 }
